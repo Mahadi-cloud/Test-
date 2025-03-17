@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subtitle Translator</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        /* ড্র্যাগ অ্যান্ড ড্রপ এরিয়া স্টাইল */
+        .drag-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            margin: 1rem 0;
+        }
+        .drag-area.active {
+            border-color: #0d6efd;
+        }
+        /* প্রিভিউ এরিয়া স্টাইল */
+        #preview {
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        /* হিডেন ক্লাস */
+        .hidden {
+            display: none;
+        }
+        /* প্রোগ্রেস বার ট্রানজিশন */
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="mb-4">Subtitle Translator</h1>
+        
+        <!-- ফাইল আপলোড এরিয়া -->
+        <div class="drag-area">
+            <div class="mb-3">Drag & Drop SRT/VTT File Here</div>
+            <input type="file" id="fileInput" accept=".srt,.vtt" class="form-control">
+        </div>
+
+        <!-- ভাষা নির্বাচন ড্রপডাউন -->
+        <select id="languageSelect" class="form-select mb-3">
+            <option value="bn">Bengali</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+        </select>
+
+        <!-- বাটন গ্রুপ -->
+        <div class="d-flex gap-2 mb-4">
+            <button id="translateBtn" class="btn btn-primary">Translate</button>
+            <button id="downloadBtn" class="btn btn-success hidden">Download</button>
+        </div>
+
+        <!-- প্রোগ্রেস বার -->
+        <div id="progress" class="progress hidden mb-3">
+            <div class="progress-bar" role="progressbar"></div>
+        </div>
+
+        <!-- প্রিভিউ এরিয়া -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Preview</h5>
+                <div id="preview"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API এন্ডপয়েন্ট এবং API কী
+        const GEMMA_API_ENDPOINT = 'https://api.gemma.ai/v1/translate'; // উদাহরণ এন্ডপয়েন্ট
+        const GEMMA_API_KEY = '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';
+
+        // DOM এলিমেন্ট সিলেক্ট করা
+        const dragArea = document.querySelector('.drag-area');
+        const fileInput = document.getElementById('fileInput');
+        const languageSelect = document.getElementById('languageSelect');
+        const translateBtn = document.getElementById('translateBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const preview = document.getElementById('preview');
+        const progress = document.getElementById('progress');
+
+        // ভেরিয়েবল ডিক্লেয়ার করা
+        let currentFile = null; // বর্তমান ফাইল স্টোর করার জন্য
+        let translatedContent = ''; // অনুবাদকৃত কন্টেন্ট স্টোর করার জন্য
+
+        // ড্র্যাগ অ্যান্ড ড্রপ ইভেন্ট হ্যান্ডলার
+        dragArea.addEventListener('dragover', (e) => {
+            e.preventDefault(); // ডিফল্ট ইভেন্ট বন্ধ করা
+            dragArea.classList.add('active'); // অ্যাকটিভ ক্লাস যোগ করা
+        });
+
+        dragArea.addEventListener('dragleave', () => {
+            dragArea.classList.remove('active'); // অ্যাকটিভ ক্লাস সরানো
+        });
+
+        dragArea.addEventListener('drop', (e) => {
+            e.preventDefault(); // ডিফল্ট ইভেন্ট বন্ধ করা
+            dragArea.classList.remove('active'); // অ্যাকটিভ ক্লাস সরানো
+            const file = e.dataTransfer.files[0]; // ড্রপ করা ফাইল নেওয়া
+            if (validateFile(file)) {
+                handleFile(file); // ফাইল হ্যান্ডলিং
+            }
+        });
+
+        // ফাইল ইনপুট ইভেন্ট হ্যান্ডলার
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0]; // নির্বাচিত ফাইল নেওয়া
+            if (validateFile(file)) {
+                handleFile(file); // ফাইল হ্যান্ডলিং
+            }
+        });
+
+        // ট্রান্সলেশন বাটন ক্লিক ইভেন্ট হ্যান্ডলার
+        translateBtn.addEventListener('click', async () => {
+            if (!currentFile) return; // যদি কোনো ফাইল না থাকে, ফাংশন বন্ধ করা
+            
+            try {
+                showProgress(true); // প্রোগ্রেস বার দেখানো
+                const targetLang = languageSelect.value; // টার্গেট ভাষা নেওয়া
+                const originalContent = await readFile(currentFile); // ফাইল কন্টেন্ট পড়া
+                const translated = await translateSRT(originalContent, targetLang); // ট্রান্সলেশন করা
+                
+                translatedContent = translated; // অনুবাদকৃত কন্টেন্ট স্টোর করা
+                preview.textContent = translated; // প্রিভিউতে দেখানো
+                downloadBtn.classList.remove('hidden'); // ডাউনলোড বাটন দেখানো
+                updateDownloadLink(targetLang); // ডাউনলোড লিঙ্ক আপডেট করা
+            } catch (error) {
+                alert(`Error: ${error.message}`); // এরর মেসেজ দেখানো
+            } finally {
+                showProgress(false); // প্রোগ্রেস বার লুকানো
+            }
+        });
+
+        // ফাইল ভ্যালিডেশন ফাংশন
+        function validateFile(file) {
+            const validTypes = ['text/srt', 'text/vtt', 'application/x-subrip']; // ভ্যালিড ফাইল টাইপ
+            const validExt = ['.srt', '.vtt']; // ভ্যালিড ফাইল এক্সটেনশন
+            const ext = file.name.substring(file.name.lastIndexOf('.')); // ফাইল এক্সটেনশন নেওয়া
+            
+            if (!validTypes.includes(file.type) && !validExt.includes(ext)) {
+                alert('Please upload a valid SRT or VTT file'); // ভ্যালিডেশন ফেইল হলে অ্যালার্ট
+                return false;
+            }
+            return true;
+        }
+
+        // ফাইল হ্যান্ডলিং ফাংশন
+        async function handleFile(file) {
+            currentFile = file; // বর্তমান ফাইল সেট করা
+            const content = await readFile(file); // ফাইল কন্টেন্ট পড়া
+            preview.textContent = content; // প্রিভিউতে দেখানো
+        }
+
+        // ফাইল পড়ার ফাংশন
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader(); // ফাইল রিডার তৈরি করা
+                reader.onload = (e) => resolve(e.target.result); // ফাইল পড়া শেষ হলে রেজাল্ট রিটার্ন
+                reader.onerror = reject; // এরর হলে রিজেক্ট
+                reader.readAsText(file); // ফাইল টেক্সট হিসেবে পড়া
+            });
+        }
+
+        // SRT ট্রান্সলেশন ফাংশন
+        async function translateSRT(content, targetLang) {
+            const blocks = parseSRT(content); // SRT কন্টেন্ট পার্স করা
+            const translatedBlocks = [];
+            
+            for (let i = 0; i < blocks.length; i++) {
+                const translatedText = await translateText(blocks[i].text, targetLang); // প্রতিটি ব্লক ট্রান্সলেট করা
+                translatedBlocks.push({
+                    ...blocks[i],
+                    text: translatedText
+                });
+                updateProgress(i / blocks.length); // প্রোগ্রেস বার আপডেট করা
+            }
+            
+            return buildSRT(translatedBlocks); // অনুবাদকৃত SRT বিল্ড করা
+        }
+
+        // SRT পার্সার ফাংশন
+        function parseSRT(content) {
+            return content
+                .split(/\n\s*\n/) // ডবল নিউলাইন দ্বারা ব্লক আলাদা করা
+                .filter(block => block.trim()) // ফাঁকা ব্লক ফিল্টার করা
+                .map(block => {
+                    const [index, timecode, ...text] = block.split('\n').filter(l => l.trim()); // ব্লক পার্স করা
+                    return {
+                        index: parseInt(index), // ব্লক ইনডেক্স
+                        timecode, // টাইমকোড
+                        text: text.join('\n') // টেক্সট
+                    };
+                });
+        }
+
+        // ট্রান্সলেশন API কল ফাংশন
+        async function translateText(text, targetLang) {
+            const response = await fetch(GEMMA_API_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GEMMA_API_KEY}` // API কী যোগ করা
+                },
+                body: JSON.stringify({
+                    text: text,
+                    target_lang: targetLang
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Translation failed: ${response.statusText}`); // এরর হ্যান্ডলিং
+            }
+
+            const data = await response.json();
+            return data.translatedText; // অনুবাদকৃত টেক্সট রিটার্ন
+        }
+
+        // SRT বিল্ডার ফাংশন
+        function buildSRT(blocks) {
+            return blocks.map(block => 
+                `${block.index}\n${block.timecode}\n${block.text}\n` // SRT ফরম্যাটে বিল্ড করা
+            ).join('\n');
+        }
+
+        // প্রোগ্রেস বার দেখানো/লুকানো ফাংশন
+        function showProgress(show) {
+            progress.classList.toggle('hidden', !show); // প্রোগ্রেস বার টগল করা
+            translateBtn.disabled = show; // ট্রান্সলেশন বাটন ডিসেবল করা
+        }
+
+        // প্রোগ্রেস বার আপডেট ফাংশন
+        function updateProgress(percentage) {
+            const progressBar = progress.querySelector('.progress-bar');
+            progressBar.style.width = `${Math.round(percentage * 100)}%`; // প্রোগ্রেস বার আপডেট করা
+        }
+
+        // ডাউনলোড লিঙ্ক আপডেট ফাংশন
+        function updateDownloadLink(lang) {
+            const blob = new Blob([translatedContent], { type: 'text/plain' }); // ব্লব তৈরি করা
+            const url = URL.createObjectURL(blob); // ব্লব URL তৈরি করা
+            downloadBtn.onclick = () => {
+                const link = document.createElement('a');
+                link.href = url; // ডাউনলোড লিঙ্ক সেট করা
+                link.download = `subtitle_${lang}.srt`; // ফাইল নাম সেট করা
+                link.click(); // লিঙ্ক ক্লিক করা
+                URL.revokeObjectURL(url); // URL রিভোক করা
+            };
+        }
+    </script>
+</body>
+  </html>
