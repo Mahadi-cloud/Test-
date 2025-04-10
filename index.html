@@ -1,290 +1,891 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Subtitle Translator</title>
-  <style>
-    /* General Styles */
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #f4f4f9, #e0e0e8);
-      color: #333;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 2rem;
-    }
-
-    .container {
-      background: #fff;
-      padding: 2rem;
-      border-radius: 15px;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-      width: 100%;
-      max-width: 1000px;
-      text-align: center;
-    }
-
-    h1 {
-      margin-bottom: 1.5rem;
-      color: #444;
-      font-size: 2rem;
-    }
-
-    /* File Upload */
-    .file-upload {
-      margin-bottom: 1.5rem;
-    }
-
-    .upload-label {
-      display: inline-block;
-      padding: 0.75rem 1.5rem;
-      background: #007bff;
-      color: #fff;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    .upload-label:hover {
-      background: #0056b3;
-    }
-
-    .upload-label input {
-      display: none;
-    }
-
-    /* Textarea */
-    textarea {
-      width: 100%;
-      padding: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      font-size: 1rem;
-      margin-bottom: 1.5rem;
-      resize: vertical;
-    }
-
-    /* Controls */
-    .controls {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-    }
-
-    label {
-      font-size: 1rem;
-      color: #555;
-    }
-
-    select {
-      padding: 0.5rem;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      font-size: 1rem;
-    }
-
-    button {
-      padding: 0.5rem 1rem;
-      background-color: #007bff;
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-    }
-
-    button:hover {
-      background-color: #0056b3;
-    }
-
-    /* Loading State */
-    .loading {
-      display: none;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 1.5rem;
-    }
-
-    .spinner {
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #007bff;
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      animation: spin 1s linear infinite;
-      margin-right: 10px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* Output Sections */
-    .output-container {
-      display: flex;
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    .output-section {
-      flex: 1;
-    }
-
-    .output {
-      background: #f9f9f9;
-      padding: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      text-align: left;
-      font-size: 1rem;
-      color: #333;
-      min-height: 200px;
-      white-space: pre-wrap;
-      margin-bottom: 1rem;
-    }
-
-    .download-btn {
-      width: 100%;
-      margin-top: 0.5rem;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Subtitle Translator</h1>
-    <div class="file-upload">
-      <label for="fileInput" class="upload-label">
-        <span>Upload SRT/TXT/VTT File</span>
-        <input type="file" id="fileInput" accept=".srt,.txt,.vtt">
-      </label>
-    </div>
-    <textarea id="subtitleInput" rows="10" placeholder="Or enter subtitles here..."></textarea>
-    <div class="controls">
-      <label for="languageSelect">Translate to:</label>
-      <select id="languageSelect">
-        <option value="en">English</option>
-        <option value="es">Spanish</option>
-        <option value="fr">French</option>
-        <option value="de">German</option>
-        <option value="bn">Bengali</option>
-      </select>
-      <button id="translateButton">Translate</button>
-    </div>
-    <div id="loading" class="loading">
-      <div class="spinner"></div>
-      <span>Translating...</span>
-    </div>
-    <div class="output-container">
-      <div class="output-section">
-        <h2>Original Subtitles:</h2>
-        <div id="originalOutput" class="output"></div>
-        <button id="downloadOriginal" class="download-btn">Download Original</button>
-      </div>
-      <div class="output-section">
-        <h2>Translated Subtitles:</h2>
-        <div id="translatedOutput" class="output"></div>
-        <button id="downloadTranslated" class="download-btn">Download Translated</button>
-      </div>
-    </div>
-  </div>
-  <script>
-    const API_KEY = "445ccb69171a7002af5e0051157b962940cc984d228cb69998ea59c1f0cf9040"; // Replace with your Gemini API key
-    const API_URL = "https://api.gemini.com/v1/translate"; // Replace with the actual Gemini API endpoint
-
-    const fileInput = document.getElementById("fileInput");
-    const subtitleInput = document.getElementById("subtitleInput");
-    const languageSelect = document.getElementById("languageSelect");
-    const translateButton = document.getElementById("translateButton");
-    const loading = document.getElementById("loading");
-    const originalOutput = document.getElementById("originalOutput");
-    const translatedOutput = document.getElementById("translatedOutput");
-    const downloadOriginal = document.getElementById("downloadOriginal");
-    const downloadTranslated = document.getElementById("downloadTranslated");
-
-    // Handle file upload
-    fileInput.addEventListener("change", (event) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const text = e.target?.result;
-          subtitleInput.value = text;
-          originalOutput.innerText = text;
-        };
-        reader.readAsText(file);
-      }
-    });
-
-    // Handle translation
-    translateButton.addEventListener("click", async () => {
-      const text = subtitleInput.value;
-      const targetLanguage = languageSelect.value;
-
-      if (!text) {
-        alert("Please enter or upload subtitles to translate.");
-        return;
-      }
-
-      loading.style.display = "flex";
-      translatedOutput.innerText = "";
-
-      try {
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            text: text,
-            target_language: targetLanguage,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}`);
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blogger XML Templates Guide</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-okaidia.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
         }
+        .code-block {
+            border-radius: 0.5rem;
+            margin: 1.5rem 0;
+            overflow-x: auto;
+        }
+        .section {
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .tag-example {
+            background-color: #f3f4f6;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            color: #374151;
+        }
+        .content-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .toc-item {
+            padding: 0.25rem 0;
+        }
+        .toc-link {
+            text-decoration: none;
+            color: #3b82f6;
+        }
+        .toc-link:hover {
+            text-decoration: underline;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-12 px-4">
+        <div class="content-container">
+            <h1 class="text-4xl font-bold mb-4">Blogger XML Templates Guide</h1>
+            <p class="text-xl">A comprehensive guide to understanding, creating and customizing Blogger XML templates</p>
+        </div>
+    </header>
 
-        const data = await response.json();
-        translatedOutput.innerText = data.translated_text; // Adjust based on Gemini API response structure
-      } catch (error) {
-        console.error("Error translating subtitles:", error);
-        translatedOutput.innerText = "Translation failed. Please try again.";
-      } finally {
-        loading.style.display = "none";
+    <main class="content-container px-4 py-8">
+        <div class="flex flex-col md:flex-row gap-8">
+            <div class="md:w-1/4 bg-white p-6 rounded-lg shadow-md h-full">
+                <h2 class="text-xl font-bold mb-4">Table of Contents</h2>
+                <nav>
+                    <ul class="space-y-2">
+                        <li class="toc-item"><a href="#introduction" class="toc-link">Introduction</a></li>
+                        <li class="toc-item"><a href="#basic-structure" class="toc-link">Basic Structure</a></li>
+                        <li class="toc-item"><a href="#namespaces" class="toc-link">XML Namespaces</a></li>
+                        <li class="toc-item"><a href="#sections" class="toc-link">Sections</a></li>
+                        <li class="toc-item"><a href="#widgets" class="toc-link">Widgets</a></li>
+                        <li class="toc-item"><a href="#data-tags" class="toc-link">Data Tags</a></li>
+                        <li class="toc-item"><a href="#includables" class="toc-link">Includables</a></li>
+                        <li class="toc-item"><a href="#conditional-tags" class="toc-link">Conditional Tags</a></li>
+                        <li class="toc-item"><a href="#loops" class="toc-link">Loops</a></li>
+                        <li class="toc-item"><a href="#complete-example" class="toc-link">Complete Example</a></li>
+                        <li class="toc-item"><a href="#customization" class="toc-link">Customization Tips</a></li>
+                        <li class="toc-item"><a href="#troubleshooting" class="toc-link">Troubleshooting</a></li>
+                        <li class="toc-item"><a href="#resources" class="toc-link">Additional Resources</a></li>
+                    </ul>
+                </nav>
+            </div>
+            
+            <div class="md:w-3/4 bg-white p-6 rounded-lg shadow-md">
+                <section id="introduction" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Introduction to Blogger XML Templates</h2>
+                    <p class="mb-4">
+                        A Blogger template is an XML-based design package containing CSS, JavaScript, and structured markup that determines how your Blogger site looks and functions. Unlike traditional HTML templates, Blogger uses a special XML format that allows the platform to dynamically insert content from your blog posts, comments, and other blog elements.
+                    </p>
+                    <p class="mb-4">
+                        The XML template format enables the Blogger platform to:
+                    </p>
+                    <ul class="list-disc pl-6 mb-4">
+                        <li>Insert dynamic content like posts, comments, and sidebars</li>
+                        <li>Create responsive layouts that work across devices</li>
+                        <li>Provide layout customization options through the Blogger interface</li>
+                        <li>Support various widgets and gadgets</li>
+                        <li>Enable conditional display of content based on page type</li>
+                    </ul>
+                    <p>
+                        Understanding Blogger's XML template structure is crucial for anyone looking to create custom designs or modify existing templates beyond what's possible with Blogger's built-in customization tools.
+                    </p>
+                </section>
+
+                <section id="basic-structure" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Basic Structure of a Blogger XML Template</h2>
+                    <p class="mb-4">
+                        Every Blogger XML template follows a standard structure that begins with XML declaration and DOCTYPE, followed by the HTML element with special Blogger namespaces:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;?xml version="1.0" encoding="UTF-8" ?&gt;
+&lt;!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"&gt;
+&lt;html xmlns='http://www.w3.org/1999/xhtml' 
+      xmlns:b='http://www.google.com/2005/gml/b' 
+      xmlns:data='http://www.google.com/2005/gml/data' 
+      xmlns:expr='http://www.google.com/2005/gml/expr'&gt;
+  &lt;head&gt;
+    &lt;title&gt;&lt;data:blog.pageTitle/&gt;&lt;/title&gt;
+    &lt;meta content='width=device-width, initial-scale=1, maximum-scale=1' name='viewport'/&gt;
+    &lt;b:skin&gt;&lt;![CDATA[/*
+      CSS styles go here
+    */]]&gt;&lt;/b:skin&gt;
+    &lt;b:template-skin&gt;&lt;![CDATA[
+      /* Template-specific styles for responsive layouts */
+    ]]&gt;&lt;/b:template-skin&gt;
+  &lt;/head&gt;
+  &lt;body&gt;
+    &lt;!-- Template body content with sections and widgets --&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                    </div>
+                    <p>
+                        This basic structure includes the XML declaration, XHTML DOCTYPE, special namespace declarations, and the standard HTML structure. Within this framework, Blogger templates contain specialized elements that define how content is displayed.
+                    </p>
+                </section>
+
+                <section id="namespaces" class="section">
+                    <h2 class="text-2xl font-bold mb-4">XML Namespaces in Blogger Templates</h2>
+                    <p class="mb-4">
+                        Blogger templates use several XML namespaces to distinguish between standard HTML elements and Blogger-specific functionality:
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-4 py-2 border">Namespace</th>
+                                    <th class="px-4 py-2 border">Prefix</th>
+                                    <th class="px-4 py-2 border">Purpose</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="px-4 py-2 border">http://www.w3.org/1999/xhtml</td>
+                                    <td class="px-4 py-2 border">(default)</td>
+                                    <td class="px-4 py-2 border">Standard XHTML elements</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">http://www.google.com/2005/gml/b</td>
+                                    <td class="px-4 py-2 border">b:</td>
+                                    <td class="px-4 py-2 border">Blogger-specific layout elements like sections, widgets, includables</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">http://www.google.com/2005/gml/data</td>
+                                    <td class="px-4 py-2 border">data:</td>
+                                    <td class="px-4 py-2 border">Access to blog data (titles, posts, comments, etc.)</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">http://www.google.com/2005/gml/expr</td>
+                                    <td class="px-4 py-2 border">expr:</td>
+                                    <td class="px-4 py-2 border">Expressions for conditional logic</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-4">
+                        These namespaces allow you to use special tags and attributes that control how Blogger renders your template and integrates dynamic content from your blog.
+                    </p>
+                </section>
+
+                <section id="sections" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Sections</h2>
+                    <p class="mb-4">
+                        Sections are container elements that define the layout structure of your blog. Each section can contain multiple widgets and helps organize the content areas of your blog.
+                    </p>
+                    <p class="mb-4">
+                        Basic syntax for a section:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:section id='header' class='header' maxwidgets='1' showaddelement='yes'&gt;
+  &lt;!-- Widgets go here --&gt;
+&lt;/b:section&gt;</code></pre>
+                    </div>
+                    <p class="mb-4">
+                        Section attributes include:
+                    </p>
+                    <ul class="list-disc pl-6 mb-4">
+                        <li><strong>id</strong>: Unique identifier for the section (required)</li>
+                        <li><strong>class</strong>: CSS class name(s) for styling</li>
+                        <li><strong>maxwidgets</strong>: Maximum number of widgets allowed in this section</li>
+                        <li><strong>showaddelement</strong>: Controls whether the "Add a Gadget" option appears in the Layout tab (yes/no)</li>
+                        <li><strong>preferred</strong>: Whether this is a preferred location for certain widget types</li>
+                        <li><strong>locked</strong>: Prevents users from adding, removing, or rearranging widgets (true/false)</li>
+                    </ul>
+                    <p class="mb-4">
+                        Common sections in a Blogger template include:
+                    </p>
+                    <ul class="list-disc pl-6">
+                        <li><strong>header</strong>: Contains the blog title, description, and navigation</li>
+                        <li><strong>main</strong>: Primary content area for blog posts</li>
+                        <li><strong>sidebar</strong>: Side column(s) for widgets like profile, archives, labels</li>
+                        <li><strong>footer</strong>: Bottom area with copyright, additional links, etc.</li>
+                    </ul>
+                </section>
+
+                <section id="widgets" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Widgets</h2>
+                    <p class="mb-4">
+                        Widgets are the building blocks that go inside sections and display specific types of content. A widget must be placed inside a section element.
+                    </p>
+                    <p class="mb-4">
+                        Basic syntax for a widget:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:widget id='Header1' locked='false' title='Blog Header' type='Header'&gt;
+  &lt;b:includable id='main' var='this'&gt;
+    &lt;!-- Widget content display logic --&gt;
+  &lt;/b:includable&gt;
+&lt;/b:widget&gt;</code></pre>
+                    </div>
+                    <p class="mb-4">
+                        Widget attributes include:
+                    </p>
+                    <ul class="list-disc pl-6 mb-4">
+                        <li><strong>id</strong>: Unique identifier for the widget</li>
+                        <li><strong>locked</strong>: Whether widget can be moved or removed (true/false)</li>
+                        <li><strong>title</strong>: Display title for the widget</li>
+                        <li><strong>type</strong>: The type of widget (determines functionality)</li>
+                        <li><strong>pageType</strong>: Which page types this widget appears on (optional)</li>
+                        <li><strong>mobile</strong>: Whether the widget appears on mobile (yes/no)</li>
+                    </ul>
+                    <p class="mb-4">
+                        Common built-in widget types in Blogger:
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-4 py-2 border">Widget Type</th>
+                                    <th class="px-4 py-2 border">Purpose</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="px-4 py-2 border">Blog</td>
+                                    <td class="px-4 py-2 border">Displays blog posts</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Header</td>
+                                    <td class="px-4 py-2 border">Blog title and description</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">HTML</td>
+                                    <td class="px-4 py-2 border">Custom HTML content</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">BlogArchive</td>
+                                    <td class="px-4 py-2 border">Archive of blog posts</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Label</td>
+                                    <td class="px-4 py-2 border">Blog post categories/tags</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Profile</td>
+                                    <td class="px-4 py-2 border">Author profile information</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">LinkList</td>
+                                    <td class="px-4 py-2 border">List of links (e.g., for navigation)</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Image</td>
+                                    <td class="px-4 py-2 border">Displays an image</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">ContactForm</td>
+                                    <td class="px-4 py-2 border">Contact form for visitors</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">PageList</td>
+                                    <td class="px-4 py-2 border">List of pages in the blog</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="data-tags" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Data Tags</h2>
+                    <p class="mb-4">
+                        Data tags allow you to access dynamic blog content from the Blogger database. They provide the connection between your template design and the actual blog content.
+                    </p>
+                    <p class="mb-4">
+                        Basic syntax for data tags:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;data:blog.pageTitle/&gt;
+&lt;data:post.title/&gt;
+&lt;data:blog.url/&gt;</code></pre>
+                    </div>
+                    <p class="mb-4">
+                        Common global data tags available throughout the template:
+                    </p>
+                    <ul class="list-disc pl-6 mb-4">
+                        <li><strong>&lt;data:blog.title/&gt;</strong>: The blog's title</li>
+                        <li><strong>&lt;data:blog.pageTitle/&gt;</strong>: Title of the current page</li>
+                        <li><strong>&lt;data:blog.url/&gt;</strong>: URL of the current page</li>
+                        <li><strong>&lt;data:blog.homepageUrl/&gt;</strong>: Homepage URL of the blog</li>
+                        <li><strong>&lt;data:blog.languageDirection/&gt;</strong>: Text direction (ltr or rtl)</li>
+                        <li><strong>&lt;data:blog.feedLinks/&gt;</strong>: Feed links for the blog</li>
+                        <li><strong>&lt;data:blog.locale/&gt;</strong>: Blog's locale</li>
+                    </ul>
+                    <p class="mb-4">
+                        Post-specific data tags (available in post contexts):
+                    </p>
+                    <ul class="list-disc pl-6">
+                        <li><strong>&lt;data:post.id/&gt;</strong>: Unique ID of the post</li>
+                        <li><strong>&lt;data:post.title/&gt;</strong>: Post title</li>
+                        <li><strong>&lt;data:post.body/&gt;</strong>: Post content</li>
+                        <li><strong>&lt;data:post.url/&gt;</strong>: URL of the post</li>
+                        <li><strong>&lt;data:post.timestamp/&gt;</strong>: Post timestamp</li>
+                        <li><strong>&lt;data:post.author/&gt;</strong>: Post author's name</li>
+                        <li><strong>&lt;data:post.labels/&gt;</strong>: List of post labels</li>
+                        <li><strong>&lt;data:post.numComments/&gt;</strong>: Number of comments</li>
+                        <li><strong>&lt;data:post.allowComments/&gt;</strong>: Whether comments are allowed</li>
+                    </ul>
+                </section>
+
+                <section id="includables" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Includables</h2>
+                    <p class="mb-4">
+                        Includables are reusable template fragments within widgets. They allow you to define a piece of markup once and include it in multiple places.
+                    </p>
+                    <p class="mb-4">
+                        Basic syntax for defining an includable:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:includable id='postAuthor' var='post'&gt;
+  &lt;div class='author'&gt;
+    Posted by &lt;data:post.author/&gt;
+  &lt;/div&gt;
+&lt;/b:includable&gt;</code></pre>
+                    </div>
+                    <p class="mb-4">
+                        Including an includable within another includable:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:includable id='post' var='post'&gt;
+  &lt;article class='blog-post'&gt;
+    &lt;h2&gt;&lt;data:post.title/&gt;&lt;/h2&gt;
+    &lt;b:include name='postAuthor' data='post'/&gt;
+    &lt;div class='post-body'&gt;
+      &lt;data:post.body/&gt;
+    &lt;/div&gt;
+  &lt;/article&gt;
+&lt;/b:includable&gt;</code></pre>
+                    </div>
+                    <p class="mb-4">
+                        Key points about includables:
+                    </p>
+                    <ul class="list-disc pl-6">
+                        <li>Each widget must have a 'main' includable that serves as the entry point</li>
+                        <li>The 'var' attribute defines a variable name for accessing data within the includable</li>
+                        <li>Includables can receive data from the parent includable through the 'data' attribute</li>
+                        <li>Includables can include other includables, allowing for modular template design</li>
+                        <li>Overriding default includables is a common way to customize widget appearance</li>
+                    </ul>
+                </section>
+
+                <section id="conditional-tags" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Conditional Tags</h2>
+                    <p class="mb-4">
+                        Conditional tags allow you to display content conditionally based on various criteria. This is essential for creating templates that adapt to different page types.
+                    </p>
+                    <p class="mb-4">
+                        Basic syntax for conditional tags:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:if cond='data:blog.pageType == "item"'&gt;
+  &lt;!-- Content to display only on individual post pages --&gt;
+&lt;b:elseif cond='data:blog.pageType == "archive"'/&gt;
+  &lt;!-- Content to display only on archive pages --&gt;
+&lt;b:else/&gt;
+  &lt;!-- Content to display on all other pages --&gt;
+&lt;/b:if&gt;</code></pre>
+                    </div>
+                    <p class="mb-4">
+                        Common conditional use cases:
+                    </p>
+                    <ul class="list-disc pl-6 mb-4">
+                        <li><strong>Page type checks</strong>: Show different content based on page type</li>
+                        <li><strong>Data presence checks</strong>: Display elements only if specific data exists</li>
+                        <li><strong>Mobile device detection</strong>: Adapt layout for mobile devices</li>
+                        <li><strong>Post feature checks</strong>: Show elements based on post features (comments, labels, etc.)</li>
+                    </ul>
+                    <p class="mb-4">
+                        Common conditions examples:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;!-- Check if it's the homepage --&gt;
+&lt;b:if cond='data:blog.url == data:blog.homepageUrl'&gt;
+
+&lt;!-- Check if comments are allowed --&gt;
+&lt;b:if cond='data:post.allowComments'&gt;
+
+&lt;!-- Check if post has labels --&gt;
+&lt;b:if cond='data:post.labels any'&gt;
+
+&lt;!-- Check if the view is mobile --&gt;
+&lt;b:if cond='data:blog.isMobile'&gt;
+
+&lt;!-- Check if a certain widget setting is enabled --&gt;
+&lt;b:if cond='data:this.showPostAuthor'&gt;</code></pre>
+                    </div>
+                </section>
+
+                <section id="loops" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Loops</h2>
+                    <p class="mb-4">
+                        Loops allow you to iterate over collections of data, such as posts, comments, or labels.
+                    </p>
+                    <p class="mb-4">
+                        Basic syntax for loops:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:loop values='data:posts' var='post'&gt;
+  &lt;!-- Content to repeat for each post --&gt;
+  &lt;h2&gt;&lt;data:post.title/&gt;&lt;/h2&gt;
+&lt;/b:loop&gt;</code></pre>
+                    </div>
+                    <p class="mb-4">
+                        Common loop use cases:
+                    </p>
+                    <ul class="list-disc pl-6 mb-4">
+                        <li><strong>Posts loop</strong>: Iterate through blog posts</li>
+                        <li><strong>Comments loop</strong>: Iterate through comments on a post</li>
+                        <li><strong>Labels loop</strong>: Iterate through labels/categories</li>
+                        <li><strong>Feed items loop</strong>: Iterate through feed items</li>
+                    </ul>
+                    <p class="mb-4">
+                        Example of a posts loop with index:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:loop values='data:posts' var='post' index='i'&gt;
+  &lt;article class='post post-{data:i}'&gt;
+    &lt;h2&gt;&lt;data:post.title/&gt;&lt;/h2&gt;
+    &lt;!-- Check if it's the first post --&gt;
+    &lt;b:if cond='data:i == 0'&gt;
+      &lt;div class='featured-post'&gt;Featured Post&lt;/div&gt;
+    &lt;/b:if&gt;
+    &lt;div class='post-body'&gt;&lt;data:post.body/&gt;&lt;/div&gt;
+  &lt;/article&gt;
+&lt;/b:loop&gt;</code></pre>
+                    </div>
+                </section>
+
+                <section id="complete-example" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Complete Template Example</h2>
+                    <p class="mb-4">
+                        Here's a simplified but complete Blogger XML template that demonstrates the key components:
+                    </p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;?xml version="1.0" encoding="UTF-8" ?&gt;
+&lt;!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"&gt;
+&lt;html xmlns='http://www.w3.org/1999/xhtml' xmlns:b='http://www.google.com/2005/gml/b' xmlns:data='http://www.google.com/2005/gml/data' xmlns:expr='http://www.google.com/2005/gml/expr'&gt;
+  &lt;head&gt;
+    &lt;title&gt;&lt;data:blog.pageTitle/&gt;&lt;/title&gt;
+    &lt;meta content='width=device-width, initial-scale=1' name='viewport'/&gt;
+    &lt;b:skin&gt;&lt;![CDATA[
+      /* CSS styles go here */
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f5f5f5;
       }
-    });
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      .header {
+        background: #333;
+        color: #fff;
+        padding: 20px 0;
+      }
+      .content-wrapper {
+        display: flex;
+        margin: 20px 0;
+      }
+      .main {
+        flex: 2;
+        margin-right: 30px;
+      }
+      .sidebar {
+        flex: 1;
+      }
+      .post {
+        background: #fff;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      }
+      .footer {
+        background: #333;
+        color: #fff;
+        padding: 20px 0;
+        text-align: center;
+      }
+    ]]&gt;&lt;/b:skin&gt;
+  &lt;/head&gt;
 
-    // Download original subtitles
-    downloadOriginal.addEventListener("click", () => {
-      const text = originalOutput.innerText;
-      downloadFile(text, "original_subtitles.srt");
-    });
+  &lt;body&gt;
+    &lt;div class='container'&gt;
+      &lt;!-- Header Section --&gt;
+      &lt;b:section id='header' class='header' maxwidgets='1'&gt;
+        &lt;b:widget id='Header1' locked='false' title='Blog Header' type='Header'&gt;
+          &lt;b:includable id='main'&gt;
+            &lt;div class='header-content'&gt;
+              &lt;h1&gt;&lt;a href='&lt;data:blog.homepageUrl/&gt;'&gt;&lt;data:blog.title/&gt;&lt;/a&gt;&lt;/h1&gt;
+              &lt;p&gt;&lt;data:blog.description/&gt;&lt;/p&gt;
+            &lt;/div&gt;
+          &lt;/b:includable&gt;
+        &lt;/b:widget&gt;
+      &lt;/b:section&gt;
 
-    // Download translated subtitles
-    downloadTranslated.addEventListener("click", () => {
-      const text = translatedOutput.innerText;
-      downloadFile(text, "translated_subtitles.srt");
-    });
+      &lt;div class='content-wrapper'&gt;
+        &lt;!-- Main Content Section --&gt;
+        &lt;b:section id='main' class='main'&gt;
+          &lt;b:widget id='Blog1' locked='false' title='Blog Posts' type='Blog'&gt;
+            &lt;b:includable id='main'&gt;
+              &lt;b:if cond='data:blog.pageType == "item"'&gt;
+                &lt;!-- Single post page --&gt;
+                &lt;b:include name='post' data='data:posts[0]'/&gt;
+              &lt;b:else/&gt;
+                &lt;!-- Multiple posts page --&gt;
+                &lt;b:loop values='data:posts' var='post'&gt;
+                  &lt;b:include name='post' data='post'/&gt;
+                &lt;/b:loop&gt;
+              &lt;/b:if&gt;
+            &lt;/b:includable&gt;
+            
+            &lt;b:includable id='post' var='post'&gt;
+              &lt;div class='post'&gt;
+                &lt;h2&gt;&lt;a expr:href='data:post.url'&gt;&lt;data:post.title/&gt;&lt;/a&gt;&lt;/h2&gt;
+                
+                &lt;div class='post-info'&gt;
+                  Posted by &lt;data:post.author/&gt; on &lt;data:post.timestamp/&gt;
+                  
+                  &lt;b:if cond='data:post.labels any'&gt;
+                    &lt;div class='labels'&gt;
+                      Labels:
+                      &lt;b:loop values='data:post.labels' var='label'&gt;
+                        &lt;a expr:href='data:label.url'&gt;&lt;data:label.name/&gt;&lt;/a&gt;
+                        &lt;b:if cond='not data:label.isLast'&gt;, &lt;/b:if&gt;
+                      &lt;/b:loop&gt;
+                    &lt;/div&gt;
+                  &lt;/b:if&gt;
+                &lt;/div&gt;
+                
+                &lt;div class='post-body'&gt;
+                  &lt;data:post.body/&gt;
+                &lt;/div&gt;
+                
+                &lt;b:if cond='data:blog.pageType == "item"'&gt;
+                  &lt;!-- Show comments only on the post page --&gt;
+                  &lt;div class='comments'&gt;
+                    &lt;h3&gt;Comments&lt;/h3&gt;
+                    &lt;b:if cond='data:post.allowComments'&gt;
+                      &lt;b:include name='comments' data='post'/&gt;
+                    &lt;b:else/&gt;
+                      &lt;p&gt;Comments are disabled for this post.&lt;/p&gt;
+                    &lt;/b:if&gt;
+                  &lt;/div&gt;
+                &lt;/b:if&gt;
+              &lt;/div&gt;
+            &lt;/b:includable&gt;
+            
+            &lt;b:includable id='comments' var='post'&gt;
+              &lt;b:if cond='data:post.numComments != 0'&gt;
+                &lt;b:loop values='data:post.comments' var='comment'&gt;
+                  &lt;div class='comment'&gt;
+                    &lt;div class='comment-header'&gt;
+                      &lt;b:if cond='data:comment.authorUrl'&gt;
+                        &lt;a expr:href='data:comment.authorUrl' rel='nofollow'&gt;
+                          &lt;data:comment.author/&gt;
+                        &lt;/a&gt;
+                      &lt;b:else/&gt;
+                        &lt;data:comment.author/&gt;
+                      &lt;/b:if&gt;
+                      said on &lt;data:comment.timestamp/&gt;
+                    &lt;/div&gt;
+                    &lt;div class='comment-body'&gt;
+                      &lt;data:comment.body/&gt;
+                    &lt;/div&gt;
+                  &lt;/div&gt;
+                &lt;/b:loop&gt;
+              &lt;b:else/&gt;
+                &lt;p&gt;No comments yet.&lt;/p&gt;
+              &lt;/b:if&gt;
+              
+              &lt;div class='comment-form'&gt;
+                &lt;h4&gt;Leave a comment:&lt;/h4&gt;
+                &lt;a expr:href='data:post.addCommentUrl' onclick='window.open(this.href, "_self"); return false;'&gt;Add a comment&lt;/a&gt;
+              &lt;/div&gt;
+            &lt;/b:includable&gt;
+          &lt;/b:widget&gt;
+        &lt;/b:section&gt;
+        
+        &lt;!-- Sidebar Section --&gt;
+        &lt;b:section id='sidebar' class='sidebar'&gt;
+          &lt;!-- About Widget --&gt;
+          &lt;b:widget id='Profile1' locked='false' title='About Me' type='Profile'&gt;
+            &lt;b:includable id='main'&gt;
+              &lt;div class='widget-content'&gt;
+                &lt;h2&gt;About Me&lt;/h2&gt;
+                &lt;b:if cond='data:team'&gt;
+                  &lt;!-- Team blog profile --&gt;
+                  &lt;ul&gt;
+                    &lt;b:loop values='data:authors' var='author'&gt;
+                      &lt;li&gt;
+                        &lt;a expr:href='data:author.userUrl'&gt;&lt;data:author.display-name/&gt;&lt;/a&gt;
+                      &lt;/li&gt;
+                    &lt;/b:loop&gt;
+                  &lt;/ul&gt;
+                &lt;b:else/&gt;
+                  &lt;!-- Single author profile --&gt;
+                  &lt;b:if cond='data:photo.url'&gt;
+                    &lt;img expr:src='data:photo.url' expr:alt='data:displayname'/&gt;
+                  &lt;/b:if&gt;
+                  &lt;div class='profile-info'&gt;
+                    &lt;a expr:href='data:userUrl'&gt;&lt;data:displayname/&gt;&lt;/a&gt;
+                    &lt;b:if cond='data:aboutme'&gt;
+                      &lt;p&gt;&lt;data:aboutme/&gt;&lt;/p&gt;
+                    &lt;/b:if&gt;
+                  &lt;/div&gt;
+                &lt;/b:if&gt;
+              &lt;/div&gt;
+            &lt;/b:includable&gt;
+          &lt;/b:widget&gt;
+          
+          &lt;!-- Labels Widget --&gt;
+          &lt;b:widget id='Label1' locked='false' title='Labels' type='Label'&gt;
+            &lt;b:includable id='main'&gt;
+              &lt;div class='widget-content'&gt;
+                &lt;h2&gt;Categories&lt;/h2&gt;
+                &lt;ul&gt;
+                  &lt;b:loop values='data:labels' var='label'&gt;
+                    &lt;li&gt;
+                      &lt;a expr:href='data:label.url'&gt;
+                        &lt;data:label.name/&gt; (&lt;data:label.count/&gt;)
+                      &lt;/a&gt;
+                    &lt;/li&gt;
+                  &lt;/b:loop&gt;
+                &lt;/ul&gt;
+              &lt;/div&gt;
+            &lt;/b:includable&gt;
+          &lt;/b:widget&gt;
+          
+          &lt;!-- Archives Widget --&gt;
+          &lt;b:widget id='BlogArchive1' locked='false' title='Archive' type='BlogArchive'&gt;
+            &lt;b:includable id='main'&gt;
+              &lt;div class='widget-content'&gt;
+                &lt;h2&gt;Blog Archive&lt;/h2&gt;
+                &lt;ul&gt;
+                  &lt;b:loop values='data:archives' var='archive'&gt;
+                    &lt;li&gt;
+                      &lt;a expr:href='data:archive.url'&gt;
+                        &lt;data:archive.name/&gt; (&lt;data:archive.post-count/&gt;)
+                      &lt;/a&gt;
+                    &lt;/li&gt;
+                  &lt;/b:loop&gt;
+                &lt;/ul&gt;
+              &lt;/div&gt;
+            &lt;/b:includable&gt;
+          &lt;/b:widget&gt;
+        &lt;/b:section&gt;
+      &lt;/div&gt;
+      
+      &lt;!-- Footer Section --&gt;
+      &lt;b:section id='footer' class='footer'&gt;
+        &lt;b:widget id='HTML1' locked='false' title='Footer' type='HTML'&gt;
+          &lt;b:includable id='main'&gt;
+            &lt;div class='footer-content'&gt;
+              &lt;p&gt;Copyright © &lt;span expr:title='data:blog.title'&gt;&lt;data:blog.title/&gt;&lt;/span&gt; &lt;script&gt;document.write(new Date().getFullYear())&lt;/script&gt;&lt;/p&gt;
+              &lt;p&gt;Powered by &lt;a href='https://www.blogger.com'&gt;Blogger&lt;/a&gt;&lt;/p&gt;
+            &lt;/div&gt;
+          &lt;/b:includable&gt;
+        &lt;/b:widget&gt;
+      &lt;/b:section&gt;
+    &lt;/div&gt;
+  &lt;/body&gt;
+&lt;/html&gt;</code></pre>
+                    </div>
+                </section>
 
-    // Helper function to download files
-    function downloadFile(text, filename) {
-      const blob = new Blob([text], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-  </script>
+                <section id="customization" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Customization Tips</h2>
+                    <p class="mb-4">
+                        Here are some tips for customizing Blogger XML templates:
+                    </p>
+                    <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                        <h3 class="font-bold text-blue-700">Always Backup First</h3>
+                        <p>Always download a backup of your template before making changes. In Blogger Dashboard, go to Theme → Backup/Restore to download the XML file.</p>
+                    </div>
+                    <ol class="list-decimal pl-6 mb-4">
+                        <li class="mb-2">
+                            <strong>Modify existing templates gradually</strong>: Rather than starting from scratch, modify an existing template in small steps.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Use the Blogger template designer first</strong>: Make changes that are possible through the UI before editing the XML.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Format your XML</strong>: Use the "Format template" option in the Blogger editor to make the code more readable.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Override includables</strong>: Instead of changing core widgets, override their includables with your custom versions.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Test on different devices</strong>: Ensure your template looks good on mobile, tablet, and desktop.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Use CSS variables</strong>: Define colors and other values as CSS variables for easier theme customization.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Inspect element on live blog</strong>: Use browser developer tools to identify elements before editing the XML.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Add custom CSS</strong>: Use the &lt;b:skin&gt; section to add custom styles without modifying the HTML structure.
+                        </li>
+                    </ol>
+                    <p>Example of overriding a default includable:</p>
+                    <div class="code-block">
+                        <pre><code class="language-xml">&lt;b:widget id='Blog1' locked='false' title='Blog Posts' type='Blog'&gt;
+  &lt;!-- Override just one includable while keeping the rest --&gt;
+  &lt;b:includable id='post' var='post'&gt;
+    &lt;!-- Your custom post layout --&gt;
+    &lt;div class='custom-post'&gt;
+      &lt;h2 class='post-title'&gt;&lt;a expr:href='data:post.url'&gt;&lt;data:post.title/&gt;&lt;/a&gt;&lt;/h2&gt;
+      &lt;div class='post-body'&gt;&lt;data:post.body/&gt;&lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/b:includable&gt;
+&lt;/b:widget&gt;</code></pre>
+                    </div>
+                </section>
+
+                <section id="troubleshooting" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Troubleshooting</h2>
+                    <p class="mb-4">
+                        Common issues when editing Blogger XML templates and how to resolve them:
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full border-collapse">
+                            <thead>
+                                <tr class="bg-gray-100">
+                                    <th class="px-4 py-2 border">Issue</th>
+                                    <th class="px-4 py-2 border">Possible Cause</th>
+                                    <th class="px-4 py-2 border">Solution</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="px-4 py-2 border">XML parsing error</td>
+                                    <td class="px-4 py-2 border">Unclosed tags, mismatched quotes, invalid characters</td>
+                                    <td class="px-4 py-2 border">Use an XML validator to check your template for syntax errors</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Missing content</td>
+                                    <td class="px-4 py-2 border">Incorrect data tags or missing includables</td>
+                                    <td class="px-4 py-2 border">Check that you're using the correct data paths and all required includables exist</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Layout breaks on mobile</td>
+                                    <td class="px-4 py-2 border">Missing responsive design elements</td>
+                                    <td class="px-4 py-2 border">Add appropriate media queries and test on multiple devices</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Gadgets not appearing</td>
+                                    <td class="px-4 py-2 border">Section with incorrect ID or missing widgets</td>
+                                    <td class="px-4 py-2 border">Verify section IDs match what Blogger expects and widgets are properly defined</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Conditional content not working</td>
+                                    <td class="px-4 py-2 border">Syntax error in conditional expression</td>
+                                    <td class="px-4 py-2 border">Check condition syntax and data paths in conditional statements</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-4 py-2 border">Changes not saving</td>
+                                    <td class="px-4 py-2 border">Template too large or contains invalid code</td>
+                                    <td class="px-4 py-2 border">Split changes into smaller increments or check for code validity</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mt-4">
+                        <h3 class="font-bold text-yellow-700">Tip: Recovering From Errors</h3>
+                        <p>If your template breaks after making changes, don't panic. You can restore your backup template through the Blogger interface at Theme → Backup/Restore → Restore.</p>
+                    </div>
+                </section>
+
+                <section id="resources" class="section">
+                    <h2 class="text-2xl font-bold mb-4">Additional Resources</h2>
+                    <p class="mb-4">
+                        Here are some valuable resources for learning more about Blogger XML templates:
+                    </p>
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2"><i class="fas fa-book"></i></span>
+                            <div>
+                                <strong class="block">Official Blogger Help</strong>
+                                <p>Google's documentation on Blogger templates and features.</p>
+                                <a href="https://support.google.com/blogger/" class="text-blue-500 hover:underline" target="_blank">https://support.google.com/blogger/</a>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2"><i class="fas fa-code"></i></span>
+                            <div>
+                                <strong class="block">Blogger Developer Documentation</strong>
+                                <p>Information about Blogger template tags and their usage.</p>
+                                <a href="https://support.google.com/blogger/answer/46995" class="text-blue-500 hover:underline" target="_blank">https://support.google.com/blogger/answer/46995</a>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2"><i class="fas fa-download"></i></span>
+                            <div>
+                                <strong class="block">Free Template Resources</strong>
+                                <p>Sites offering free Blogger templates to study and customize:</p>
+                                <ul class="list-disc pl-6">
+                                    <li><a href="https://btemplates.com/" class="text-blue-500 hover:underline" target="_blank">BTemplates</a></li>
+                                    <li><a href="https://gooyaabitemplates.com/" class="text-blue-500 hover:underline" target="_blank">Gooyaabi Templates</a></li>
+                                    <li><a href="https://www.soratemplates.com/" class="text-blue-500 hover:underline" target="_blank">Sora Templates</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2"><i class="fas fa-graduation-cap"></i></span>
+                            <div>
+                                <strong class="block">Tutorial Sites</strong>
+                                <p>Blogs and websites dedicated to Blogger template customization:</p>
+                                <ul class="list-disc pl-6">
+                                    <li><a href="https://www.elainegasparini.com/search/label/Blogger%20tutorial" class="text-blue-500 hover:underline" target="_blank">Elaine Gasparini</a></li>
+                                    <li><a href="https://www.templateify.com/search/label/Blogger%20Tutorials" class="text-blue-500 hover:underline" target="_blank">Templateify</a></li>
+                                </ul>
+                            </div>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-500 mr-2"><i class="fas fa-tools"></i></span>
+                            <div>
+                                <strong class="block">Useful Tools</strong>
+                                <p>Tools that can help with template development:</p>
+                                <ul class="list-disc pl-6">
+                                    <li><a href="https://www.xmlvalidation.com/" class="text-blue-500 hover:underline" target="_blank">XML Validator</a> - Check your XML syntax</li>
+                                    <li><a href="https://codebeautify.org/xmlviewer" class="text-blue-500 hover:underline" target="_blank">XML Viewer</a> - Format and beautify XML code</li>
+                                    <li><a href="https://www.freeformatter.com/html-formatter.html" class="text-blue-500 hover:underline" target="_blank">HTML Formatter</a> - Format HTML within includables</li>
+                                </ul>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-gray-800 text-white py-8 px-4">
+        <div class="content-container">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-bold mb-2">Blogger XML Templates Guide</h2>
+                    <p>A comprehensive resource for Blogger template customization</p>
+                </div>
+                <div class="mt-4 md:mt-0">
+                    <p>Last Updated: April 2025</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-xml.min.js"></script>
 </body>
 </html>
